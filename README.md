@@ -1,4 +1,4 @@
-# Server.java Project
+# File-System-Encryption
 
 ## Overview
 This project implements a distributed file server using Java. The server provides functionalities for user management, file operations, and permissions handling. It also supports basic encryption for secure data transfer between replicas.
