@@ -62,7 +62,3 @@ The project uses **DES (Data Encryption Standard)** with a default key for encry
 
 ## Contributing
 Contributions are welcome! Please ensure you test thoroughly before submitting pull requests.
-
-## License
-This project is licensed under the MIT License.
-
