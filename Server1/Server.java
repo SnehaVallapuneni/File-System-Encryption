@@ -11,7 +11,6 @@ import java.io.ObjectOutputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -20,6 +19,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
+
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -61,12 +61,7 @@ public class Server{
         File ipAddressFile = new File("./meta/ipAddress.txt");
         Scanner scanner = new Scanner(ipAddressFile);
 
-        /*while(scanner.hasNextLine()){
-            String line = scanner.nextLine();
-            ips.add(InetAddress.getByName(line));
-        }*/
-
-       while (scanner.hasNextLine()) {
+        while (scanner.hasNextLine()) {
             String line = scanner.nextLine().trim();
             if (line.isEmpty()) continue;
     
@@ -122,28 +117,6 @@ public class Server{
         t1.start();
         starter();
     }
-   /* public static void InitializeMetaData(){
-        
-        File readPermissionFile = new File("./meta/readpermissions.txt"); 
-        @SuppressWarnings("unchecked") 
-        Map<String,List<String>> readPermissions = (Map<String,List<String>>)deserializeObj(readPermissionFile.getPath());         
-        File writePermissionFile = new File("./meta/writepermissions.txt");
-        @SuppressWarnings("unchecked") 
-        writePermissions = (Map<String,List<String>>)deserializeObj(writePermissionFile.getPath());         
-        File ownerPermissionFile = new File("./meta/ownerpermissions.txt");
-        @SuppressWarnings("unchecked") 
-        Map<String,List<String>> ownerPermissions = (Map<String,List<String>>)deserializeObj(ownerPermissionFile.getPath());         
-        File usersFile = new File("./meta/users.txt");
-        @SuppressWarnings("unchecked") 
-        Map<String,String> usersList = (Map<String,String>)deserializeObj(usersFile.getPath()); 
-
-        String path = "./AllFiles";
-        filesAvailable= listAllFiles(path);
-        for(int i=0;i<filesAvailable.size();i++){
-            fileLocks.put(filesAvailable.get(i), 0);
-        }
-        
-    }*/
     public static void InitializeMetaData() {
         File readPermissionFile = new File("./meta/readpermissions.txt");
         readPermissions = (Map<String,List<String>>) deserializeObj(readPermissionFile.getPath());
@@ -162,7 +135,6 @@ public class Server{
             fileLocks.put(filesAvailable.get(i), 0);
         }
     }
-
     public static void firstTimeInitializeMetaData(){
             readPermissions = new HashMap();
             serializeObj(readPermissions, "./meta/readPermissions.txt");
@@ -200,22 +172,6 @@ public class Server{
             e.printStackTrace();
         }
     }
-    /*@SuppressWarnings("unchecked")
-    public static Object deserializeObj(String filename){
-        Object object = null;
-        try{
-            FileInputStream fis = new FileInputStream(filename);
-            ObjectInputStream ois = new ObjectInputStream(fis);
-            object = ois.readObject();
-            ois.close();
-            fis.close();
-            return object;
-        }
-        catch(Exception e){
-            e.printStackTrace();
-        }
-        return object;
-    }*/
    @SuppressWarnings("unchecked")
     public static <T> T deserializeObj(String filename) {
         T object = null;
@@ -283,13 +239,13 @@ public class Server{
         try {
             String op=data.split(" ")[0];
             String user=data.split(" ")[1];
-            
-            
-            String filename="./AllFiles/"+data.split(" ")[2];
+                     
+            String filename = "./AllFiles/" + data.split(" ")[2].trim();
             String message="";
             switch(op){
                 case "create":
                     try {
+                        filesAvailable = listAllFiles("./AllFiles");
                         File file=new File(filename);
                         if(!file.exists()){
                             file.createNewFile();
@@ -321,11 +277,14 @@ public class Server{
                                 DatagramPacket ReplicaDatapSend =new DatagramPacket(replicaBufferedData, replicaBufferedData.length, ips.get(i), replicaReceivePortsList.get(i));
                                 serverSocket.send(ReplicaDatapSend); 
                             }
+                            
                             System.out.println("File created");
                         }
                         else{
                             System.out.println("File exists");
                         }
+                        filesAvailable = listAllFiles("./AllFiles");
+                        //System.out.println("Updated filesAvailable: " + filesAvailable);
                     } catch (Exception e) {
                         e.printStackTrace();
                        // System.out.println("Error");
@@ -333,40 +292,52 @@ public class Server{
                     break;
                 case "read":
                     try {
-                        if(filesAvailable.contains(filename)){
-                            List<String> readPerms = readPermissions.get(filename);
-                            if (readPerms != null && readPerms.contains(user)) {
-                                File file=new File(filename);
+                        //filename = "./AllFiles/" + data.split(" ")[2].trim();
+                        //System.out.println("Attempting to read file at path: " + filename);
+                        //System.out.println("File exists on disk: " + new File(filename).exists());
+                        //System.out.println("Current files in memory: " + filesAvailable);
+
+                        if (filesAvailable.contains(filename) && new File(filename).exists()) {
+                            List<String> readPerms = readPermissions.getOrDefault(filename, new ArrayList<>());
+                            if (readPerms.contains(user)) {
+                                File file = new File(filename);
+                                boolean hasContent = false;
                                 if(file.exists()){
                                     String filePath=readFile(filename);
                                     File tempFile=new File(filePath);
                                     Scanner readData=new Scanner(tempFile);
                                     while(readData.hasNextLine()){
                                         System.out.println(readData.nextLine());
+                                        hasContent = true;
+                                    }
+                                    if (!hasContent) {
+                                        System.out.println("File is empty!!!");
                                     }
                                     readData.close();
                                     tempFile.delete();
                                 }
-                                else{
-                                    System.out.println("File does not exist");
-                                }
+                                filesAvailable = listAllFiles("./AllFiles");
+                                //System.out.println("Updated filesAvailable: " + filesAvailable);
+                            } else {
+                                System.out.println("You don't have permission to read this file.");
                             }
-                            else{
-                                System.out.println("You don't have permission to read");
-                            }
+                        } else {
+                            System.out.println("File does not exist.");
                         }
-                        else{
-                            System.out.println("File does not exist");
-                        }
-                    } 
-                    catch (Exception e) {
+                    } catch (Exception e) {
                         e.printStackTrace();
-                       // System.out.println("Error");
                     }
                     break;
+
                 case "write":
                     try{
-                        if(filesAvailable.contains(filename)){
+                        //System.out.println("Attempting to read file at path: " + filename);
+                        //System.out.println("File exists on disk: " + new File(filename).exists());
+                        //System.out.println("Current files in memory: " + filesAvailable);
+
+                        if(filesAvailable.contains(filename) && new File(filename).exists()){
+                            List<String> writePerms = writePermissions.getOrDefault(filename, new ArrayList<>());
+                            if (writePerms.contains(user)) {
                              int lockStatus = fileLocks.getOrDefault(filename, 0);
                              if (lockStatus == 0) {
                                 fileLocks.put(filename, 1); // Lock the file
@@ -407,6 +378,7 @@ public class Server{
                                         }
                                         System.out.println("Data written to the file");
                                         fileLocks.put(filename,0);
+                                        filesAvailable = listAllFiles("./AllFiles");
                                     }
                                     else{
                                         System.out.println("Error finding file");
@@ -416,6 +388,7 @@ public class Server{
                                     System.out.println("cannot write to the file");
                                 }
                             }
+                        }
                         else{
                             System.out.println("File does not exist");
                         }
@@ -433,11 +406,11 @@ public class Server{
                             System.out.println("Login success");
                         }
                         else{
-                            System.out.println("User does not exist");
+                            System.out.println("User does not exist. Exiting");
+                            System.exit(1);
                         }
                     } catch (Exception e) {
-                       // System.out.println("Error");
-                        e.printStackTrace();
+                        System.out.println("Error");
                     }
                     break;
                 case "register":
@@ -445,11 +418,15 @@ public class Server{
                         String password=data.split(" ")[2];
                         if(!usersList.containsKey(user)){
                             usersList.put(user,password);
+                            
                             for(int i=0;i<replicaReceivePortsList.size();i++){
                                 if(id == i)
                                     continue;
-                                byte[] replicaBufferedData = encrypt(message).getBytes();
+                                System.out.println(replicaPortsList.get(i));
+                                //byte[] replicaBufferedData = encrypt(data).getBytes();
+                                byte[] replicaBufferedData = encrypt(data).getBytes();
                                 DatagramPacket ReplicaDatapSend =new DatagramPacket(replicaBufferedData, replicaBufferedData.length, ips.get(i), replicaPortsList.get(i));
+                                System.out.println(ReplicaDatapSend.getPort()+" "+ReplicaDatapSend.getAddress());
                                 serverSocket.send(ReplicaDatapSend); 
                             }
                             serializeObj(usersList, "./meta/users.txt");
@@ -460,7 +437,7 @@ public class Server{
                         }
                     } catch (Exception e) {
                         e.printStackTrace();
-                       // System.out.println("Error");
+                        //System.out.println("Error");
                     }
                     break;
 
@@ -522,20 +499,24 @@ public class Server{
                         File file = new File(filename);
                         if (file.exists() && ownerPermissions.containsKey(filename) && ownerPermissions.get(filename).contains(user)) {
                             file.delete();
-                            filesAvailable.remove(filename);
-                            fileLocks.remove(filename);
-                            readPermissions.remove(filename);
-                            writePermissions.remove(filename);
-                            ownerPermissions.remove(filename);
-                            serializeObj(readPermissions, "./meta/readpermissions.txt");
-                            serializeObj(writePermissions, "./meta/writepermissions.txt");
-                            serializeObj(ownerPermissions, "./meta/ownerpermissions.txt");
                             for (int i = 0; i < replicaReceivePortsList.size(); i++) {
                                 if (id == i) continue;
                                 byte[] replicaBufferedData = encrypt(data).getBytes();
                                 DatagramPacket ReplicaDatapSend = new DatagramPacket(replicaBufferedData,replicaBufferedData.length,ips.get(i),replicaReceivePortsList.get(i));
                                 serverSocket.send(ReplicaDatapSend);
-                             }
+                            }
+                            filesAvailable.remove(filename);
+                            fileLocks.remove(filename);
+                            readPermissions.remove(filename);
+                            writePermissions.remove(filename);
+                            ownerPermissions.remove(filename);
+
+                            serializeObj(readPermissions, "./meta/readpermissions.txt");
+                            serializeObj(writePermissions, "./meta/writepermissions.txt");
+                            serializeObj(ownerPermissions, "./meta/ownerpermissions.txt");
+
+                            filesAvailable = listAllFiles("./AllFiles");
+
                             System.out.println("File deleted and replicated.");
                         } else {
                             System.out.println("File does not exist or you don't have permission to delete it.");
@@ -609,7 +590,7 @@ public class Server{
                                 {
                                     PacketReceive = new DatagramPacket(receiveData, receiveData.length);
                                     replicaSocket.receive(PacketReceive);
-                                    System.out.println("Client:-" + decrypt(data(receiveData).toString()));
+                                    //System.out.println("Client:-" + decrypt(data(receiveData).toString()));
                                     String writeData = decrypt(data(receiveData).toString());
                                     if(writeData.startsWith("Done")){
                                         fileLocks.put(fileName,0);
@@ -641,14 +622,6 @@ public class Server{
                             serializeObj(readPermissions, "./meta/readpermissions.txt");
                             serializeObj(writePermissions, "./meta/writepermissions.txt");
                             serializeObj(ownerPermissions, "./meta/ownerpermissions.txt");
-                            /*List<String> permlist = new ArrayList<>();
-                            permlist.add(user);
-                            readPermissions.put(fileName,permlist);
-                            serializeObj(readPermissions, "./meta/readpermissions.txt");
-                            writePermissions.put(fileName,permlist);
-                            serializeObj(writePermissions, "./meta/writepermissions.txt");
-                            ownerPermissions.put(fileName,permlist);
-                            serializeObj(ownerPermissions, "./meta/ownerpermissions.txt");*/
                         }
                         break;
                     case "delete":
@@ -663,11 +636,20 @@ public class Server{
                             ownerPermissions.remove(fileName);
                             serializeObj(ownerPermissions, "./meta/ownerpermissions.txt");
                             filesAvailable.remove(fileName);
+                           /* for (int i = 0; i < replicaReceivePortsList.size(); i++) {
+                                if (id == i) continue; // skip self
+                                byte[] replicaBufferedData = encrypt("delete " + user + " " + fileName).getBytes();
+                                 DatagramPacket ReplicaDatapSend = new DatagramPacket(replicaBufferedData, replicaBufferedData.length, ips.get(i), replicaReceivePortsList.get(i));
+                                replicaReceiveSocket.send(ReplicaDatapSend);
+                            }*/
                         }
                         break;
                     case "register":
                         String password = receivedData.split(" ")[2];
                         usersList.put(user, password);
+                        serializeObj(usersList, "./meta/users.txt");
+                        //usersList = (Map<String, String>) deserializeObj("./meta/users.txt");
+                        System.out.println("User registered on replica: " + user);
                         break;
                     case "grantPermissions":
                         String uname = receivedData.split(" ")[3];
