@@ -88,9 +88,9 @@ public class Server{
         replicaSocket = new DatagramSocket(replicaPortsList.get(id));
 
 
-        for (int i = 0; i < ips.size(); i++) {
-            System.out.println("Server " + i + " IP: " + ips.get(i) + " Port: " + replicaReceivePortsList.get(i));
-        }
+       // for (int i = 0; i < ips.size(); i++) {
+       //     System.out.println("Server " + i + " IP: " + ips.get(i) + " Port: " + replicaReceivePortsList.get(i));
+       // }
 
         //firstTimeInitializeMetaData();
         
@@ -118,6 +118,7 @@ public class Server{
             }
         } catch (Exception e) {
             System.out.println("Input mismatch");
+            System.exit(1);
         }
         
         Thread t1 = new Thread(new Runnable(){public void run(){
@@ -249,7 +250,7 @@ public class Server{
             String op=data.split(" ")[0];
             String user=data.split(" ")[1];
                      
-            String filename = "./AllFiles/" + data.split(" ")[2].trim();
+            String filename = "./AllFiles/" + data.split(" ")[2];
             String message="";
             switch(op){
                 case "create":
@@ -259,16 +260,14 @@ public class Server{
                         if(!file.exists()){
                             file.createNewFile();
                             fileLocks.put(filename, 0);
-                            filesAvailable.add(filename);
-
+                            
                             ownerPermissions.putIfAbsent(filename, new ArrayList<>());
                             readPermissions.putIfAbsent(filename, new ArrayList<>());
                             writePermissions.putIfAbsent(filename, new ArrayList<>());
 
-                            ownerPermissions.get(filename).add(user);
-                            readPermissions.get(filename).add(user);
-                            writePermissions.get(filename).add(user);
-
+                            ownerPermissions.get(filename).add(loginUser);
+                            readPermissions.get(filename).add(loginUser);
+                            writePermissions.get(filename).add(loginUser);
                            /* List<String> userList=new ArrayList<>();
                             userList.add(loginUser);
                             ownerPermissions.put(filename,userList);
@@ -279,15 +278,16 @@ public class Server{
                             serializeObj(readPermissions, "./meta/readpermissions.txt");
                             serializeObj(writePermissions, "./meta/writepermissions.txt");
                             
+                            filesAvailable.add(filename);
+
                             for(int i=0;i<replicaReceivePortsList.size();i++){
                                 if(id == i)
                                     continue;
                                 byte[] replicaBufferedData = encrypt(data).getBytes();
                                 DatagramPacket ReplicaDatapSend =new DatagramPacket(replicaBufferedData, replicaBufferedData.length, ips.get(i), replicaReceivePortsList.get(i));
-                                System.out.println("Write permissions for " + filename + ": " + writePermissions.get(filename)+ ReplicaDatapSend.getPort());
+                                //System.out.println("Write permissions for " + filename + ": " + writePermissions.get(filename)+ ReplicaDatapSend.getPort());
                                 serverSocket.send(ReplicaDatapSend); 
                             }
-                            
                             System.out.println("File created");
                         }
                         else{
@@ -309,7 +309,7 @@ public class Server{
 
                         if (filesAvailable.contains(filename) && new File(filename).exists()) {
                             List<String> readPerms = readPermissions.getOrDefault(filename, new ArrayList<>());
-                            if (readPerms.contains(user)) {
+                            if (readPerms.contains(loginUser)) {
                                 File file = new File(filename);
                                 boolean hasContent = false;
                                 if(file.exists()){
@@ -336,7 +336,7 @@ public class Server{
                         }
                     } catch (Exception e) {
                         //e.printStackTrace();
-                        System.out.println("Error");
+                        System.out.println("Error accessing file ");
                     }
                     break;
 
@@ -347,14 +347,14 @@ public class Server{
                         //System.out.println("Current files in memory: " + filesAvailable);
 
                         if(filesAvailable.contains(filename) && new File(filename).exists()){
-                            List<String> writePerms = writePermissions.getOrDefault(filename, new ArrayList<>());
-                            if (writePerms.contains(user)) {
+                            //List<String> writePerms = writePermissions.getOrDefault(filename, new ArrayList<>());
+                           // if (writePerms.contains(loginUser)) {
                              int lockStatus = fileLocks.getOrDefault(filename, 0);
                              if (lockStatus == 0) {
                                 fileLocks.put(filename, 1); // Lock the file
                                 File file = new File(filename);
-                                System.out.println("Writable: " + file.canWrite());
-                                if(writePermissions.get(filename).contains(user)){
+                                //System.out.println("Writable: " + file.canWrite());
+                                if(writePermissions.get(filename).contains(loginUser)){
                                     byte[] replicaBufferedData;
                                     DatagramPacket ReplicaDatapSend;
                                     for(int i=0;i<replicaPortsList.size();i++){
@@ -399,7 +399,7 @@ public class Server{
                                 else{
                                     System.out.println("cannot write to the file");
                                 }
-                            }
+                           // }
                         }
                         else{
                             System.out.println("File does not exist");
@@ -407,7 +407,7 @@ public class Server{
                     } 
                     catch (Exception e) {
                         //e.printStackTrace();
-                       System.out.println("Error");
+                       System.out.println("Error while writing ");
                     }
                     break;
                 case "login":
@@ -434,7 +434,7 @@ public class Server{
                             for(int i=0;i<replicaReceivePortsList.size();i++){
                                 if(id == i)
                                     continue;
-                                System.out.println(replicaPortsList.get(i));
+                                //System.out.println(replicaPortsList.get(i));
                                 //byte[] replicaBufferedData = encrypt(data).getBytes();
                                 byte[] replicaBufferedData = encrypt(data).getBytes();
                                 DatagramPacket ReplicaDatapSend =new DatagramPacket(replicaBufferedData, replicaBufferedData.length, ips.get(i), replicaPortsList.get(i));
@@ -449,12 +449,15 @@ public class Server{
                         }
                     } catch (Exception e) {
                         //e.printStackTrace();
-                        System.out.println("Error");
+                        System.out.println("Error registering user");
                     }
                     break;
 
                 case "list":
                     try{
+                        if(filesAvailable.isEmpty()){
+                            System.out.println("No files exist");
+                        }
                         for(String s:filesAvailable){
                             if (new File(s).isDirectory() ||(ownerPermissions.get(s) != null && ownerPermissions.get(s).contains(user)) ||
                                 (readPermissions.get(s) != null && readPermissions.get(s).contains(user)) ||
@@ -517,17 +520,18 @@ public class Server{
                             
                             for (int i = 0; i < replicaReceivePortsList.size(); i++) {
                                 if (id == i) continue;
+                                String deleteRequest = "delete " + user + " " + filename;
                                 byte[] replicaBufferedData = encrypt(data).getBytes();
                                 DatagramPacket ReplicaDatapSend = new DatagramPacket(replicaBufferedData,replicaBufferedData.length,ips.get(i),replicaReceivePortsList.get(i));
-                                System.out.println("Sending delete request to replica at: " + ips.get(i) + ":" + replicaReceivePortsList.get(i));
+                                System.out.println("Sending delete request "+deleteRequest+" to replica at: " + ips.get(i) + ":" + replicaReceivePortsList.get(i));
                                 serverSocket.send(ReplicaDatapSend);
                             }
-                            filesAvailable.remove(filename);
+                            
                             fileLocks.remove(filename);
                             readPermissions.remove(filename);
                             writePermissions.remove(filename);
                             ownerPermissions.remove(filename);
-
+                            filesAvailable.remove(filename);
                             serializeObj(readPermissions, "./meta/readpermissions.txt");
                             serializeObj(writePermissions, "./meta/writepermissions.txt");
                             serializeObj(ownerPermissions, "./meta/ownerpermissions.txt");
@@ -593,7 +597,7 @@ public class Server{
                                 }
                             }
                             catch(Exception e){
-                                String msg = encrypt("Error"+user);
+                                String msg = encrypt("Error request"+user);
                                 byte[] buf = msg.getBytes();   
                                 DatagramPacket DpSend =new DatagramPacket(buf, buf.length, ipaddress, port);
                                 replicaReceiveSocket.send(DpSend); 
@@ -605,12 +609,12 @@ public class Server{
                             File file = new File(fileName);
                             if(file.exists()){
                                 byte[] receiveData = new byte[65535];
-                                DatagramPacket PacketReceive = null;
+                                DatagramPacket receivePacket = null;
                                 while (true)
                                 {
-                                    PacketReceive = new DatagramPacket(receiveData, receiveData.length);
-                                    replicaSocket.receive(PacketReceive);
-                                    //System.out.println("Client:-" + decrypt(data(receiveData).toString()));
+                                    receivePacket  = new DatagramPacket(receiveData, receiveData.length);
+                                    replicaSocket.receive(receivePacket);
+                                    //System.out.println("Message received : " + decrypt(data(receiveData).toString()));
                                     String writeData = decrypt(data(receiveData).toString());
                                     if(writeData.startsWith("Done")){
                                         fileLocks.put(fileName,0);
@@ -649,16 +653,16 @@ public class Server{
                         file = new File(fileName);
                         if(file.exists()){
                             file.delete();
-                            fileLocks.remove(fileName);
-
+                            //fileLocks.remove(fileName);
                             readPermissions.remove(fileName);
                             writePermissions.remove(fileName);
                             ownerPermissions.remove(fileName);
                             
-                            filesAvailable.remove(fileName);
                             serializeObj(readPermissions, "./meta/readpermissions.txt");
                             serializeObj(writePermissions, "./meta/writepermissions.txt");
                             serializeObj(ownerPermissions, "./meta/ownerpermissions.txt");
+
+                            filesAvailable.remove(fileName);
                             
                         }
                         else{
@@ -670,7 +674,7 @@ public class Server{
                         usersList.put(user, password);
                         serializeObj(usersList, "./meta/users.txt");
                         //usersList = (Map<String, String>) deserializeObj("./meta/users.txt");
-                        System.out.println("User registered on replica: " + user);
+                        //System.out.println("User registered on replica: " + user);
                         break;
                     case "grantPermissions":
                         String uname = receivedData.split(" ")[3];
@@ -679,14 +683,14 @@ public class Server{
                             ownerPermissions.get(fileName).add(uname);
                             readPermissions.get(fileName).add(uname);
                             writePermissions.get(fileName).add(uname);
-                            }
+                        }
                         if(perm.charAt(1)=='1'){
                             writePermissions.get(fileName).add(uname);
-                           // serializeObj(writePermissions, "./meta/writepermissions.txt");
+                           //serializeObj(writePermissions, "./meta/writepermissions.txt");
                         }
                         if(perm.charAt(2)=='1'){
                                 readPermissions.get(fileName).add(uname);
-                               // serializeObj(readPermissions, "./meta/readpermissions.txt");
+                               //serializeObj(readPermissions, "./meta/readpermissions.txt");
                         }
                         serializeObj(readPermissions, "./meta/readpermissions.txt");
                         serializeObj(writePermissions, "./meta/writepermissions.txt");
@@ -697,6 +701,7 @@ public class Server{
             } 
         }
         catch (Exception e) {
+            e.printStackTrace();
         }
     }
     public static StringBuilder data(byte[] data)
