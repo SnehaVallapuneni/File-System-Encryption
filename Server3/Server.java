@@ -443,9 +443,11 @@ public class Server{
                             }
                             serializeObj(usersList, "./meta/users.txt");
                             System.out.println("User Added");
+                            System.exit(1);
                         }
                         else{
                             System.out.println("User exists");
+                            System.exit(1);
                         }
                     } catch (Exception e) {
                         //e.printStackTrace();
