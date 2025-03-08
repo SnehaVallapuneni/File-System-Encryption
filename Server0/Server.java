@@ -1,4 +1,3 @@
-
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
@@ -499,7 +498,7 @@ public class Server{
                             for(int i=0;i<replicaReceivePortsList.size();i++){
                                 if(id == i)
                                     continue;
-                                byte[] replicaBufferedData = encrypt(message).getBytes();
+                                byte[] replicaBufferedData = encrypt(data).getBytes();
                                 DatagramPacket ReplicaDatapSend =new DatagramPacket(replicaBufferedData, replicaBufferedData.length, ips.get(i), replicaPortsList.get(i));
                                 serverSocket.send(ReplicaDatapSend); 
                             }
@@ -523,10 +522,9 @@ public class Server{
                             for (int i = 0; i < replicaReceivePortsList.size(); i++) {
                                 if (id == i) continue;
                                 String deleteRequest = "delete " + user + " " + filename;
-                                byte[] replicaBufferedData = encrypt(data).getBytes();
+                                byte[] replicaBufferedData = encrypt(deleteRequest).getBytes();
                                 DatagramPacket ReplicaDatapSend = new DatagramPacket(replicaBufferedData,replicaBufferedData.length,ips.get(i),replicaReceivePortsList.get(i));
-                                System.out.println("Sending delete request "+deleteRequest+" to replica at: " + ips.get(i) + ":" + replicaReceivePortsList.get(i));
-                                serverSocket.send(ReplicaDatapSend);
+                                replicaReceiveSocket.send(ReplicaDatapSend);
                             }
                             
                             fileLocks.remove(filename);
@@ -720,6 +718,10 @@ public class Server{
     }
     public static String readFile(String filename){
         String temp="./temp/decrypt";
+        File tempDir = new File("./temp");
+        if (!tempDir.exists()) {
+            tempDir.mkdir();
+        }
         File tempFile=new File(temp);
         try {
             if(tempFile.exists()){
@@ -740,6 +742,10 @@ public class Server{
     public static void writeFile(String filename,String writeData){
         try {
             String temp="./temp/decrypt";
+            File tempDir = new File("./temp");
+            if (!tempDir.exists()) {
+                tempDir.mkdir();
+            }
             File tempFile=new File(temp);
             if(tempFile.exists()){
                 tempFile.delete();
@@ -751,7 +757,7 @@ public class Server{
             File file=new File(filename);
             decrypt(file,tempFile);
             BufferedWriter bw=new BufferedWriter(new FileWriter(temp,true));
-            bw.write(writeData);
+            bw.write(writeData + "\n");
             bw.close();
             encrypt(tempFile,file);
             tempFile.delete();

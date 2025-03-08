@@ -1,4 +1,3 @@
-
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
@@ -499,7 +498,7 @@ public class Server{
                             for(int i=0;i<replicaReceivePortsList.size();i++){
                                 if(id == i)
                                     continue;
-                                byte[] replicaBufferedData = encrypt(message).getBytes();
+                                byte[] replicaBufferedData = encrypt(data).getBytes();
                                 DatagramPacket ReplicaDatapSend =new DatagramPacket(replicaBufferedData, replicaBufferedData.length, ips.get(i), replicaPortsList.get(i));
                                 serverSocket.send(ReplicaDatapSend); 
                             }
@@ -518,29 +517,28 @@ public class Server{
                     try {
                         File file = new File(filename);
                         if (file.exists() && ownerPermissions.containsKey(filename) && ownerPermissions.get(filename).contains(user)) {
-                            file.delete();
-                            
-                            for (int i = 0; i < replicaReceivePortsList.size(); i++) {
-                                if (id == i) continue;
-                                String deleteRequest = "delete " + user + " " + filename;
-                                byte[] replicaBufferedData = encrypt(data).getBytes();
-                                DatagramPacket ReplicaDatapSend = new DatagramPacket(replicaBufferedData,replicaBufferedData.length,ips.get(i),replicaReceivePortsList.get(i));
-                                System.out.println("Sending delete request "+deleteRequest+" to replica at: " + ips.get(i) + ":" + replicaReceivePortsList.get(i));
-                                serverSocket.send(ReplicaDatapSend);
+                            if(file.delete()) {
+                                fileLocks.remove(filename);
+                                readPermissions.remove(filename);
+                                writePermissions.remove(filename);
+                                ownerPermissions.remove(filename);
+                                
+                                serializeObj(readPermissions, "./meta/readpermissions.txt");
+                                serializeObj(writePermissions, "./meta/writepermissions.txt");
+                                serializeObj(ownerPermissions, "./meta/ownerpermissions.txt");
+
+                                filesAvailable.remove(filename);
+                                
+                                for (int i = 0; i < replicaReceivePortsList.size(); i++) {
+                                    if (id == i) continue;
+                                    String deleteRequest = "delete " + user + " " + filename;
+                                    byte[] replicaBufferedData = encrypt(deleteRequest).getBytes();
+                                    DatagramPacket ReplicaDatapSend = new DatagramPacket(replicaBufferedData,replicaBufferedData.length,ips.get(i),replicaReceivePortsList.get(i));
+                                    replicaReceiveSocket.send(ReplicaDatapSend);
+                                }
+                            } else {
+                                System.out.println("Failed to delete the file");
                             }
-                            
-                            fileLocks.remove(filename);
-                            readPermissions.remove(filename);
-                            writePermissions.remove(filename);
-                            ownerPermissions.remove(filename);
-                            filesAvailable.remove(filename);
-                            serializeObj(readPermissions, "./meta/readpermissions.txt");
-                            serializeObj(writePermissions, "./meta/writepermissions.txt");
-                            serializeObj(ownerPermissions, "./meta/ownerpermissions.txt");
-
-                            filesAvailable = listAllFiles("./AllFiles");
-
-                            System.out.println("File deleted and replicated.");
                         } else {
                             System.out.println("File does not exist or you don't have permission to delete it.");
                         }
@@ -720,6 +718,10 @@ public class Server{
     }
     public static String readFile(String filename){
         String temp="./temp/decrypt";
+        File tempDir = new File("./temp");
+        if (!tempDir.exists()) {
+            tempDir.mkdir();
+        }
         File tempFile=new File(temp);
         try {
             if(tempFile.exists()){
@@ -740,6 +742,10 @@ public class Server{
     public static void writeFile(String filename,String writeData){
         try {
             String temp="./temp/decrypt";
+            File tempDir = new File("./temp");
+            if (!tempDir.exists()) {
+                tempDir.mkdir();
+            }
             File tempFile=new File(temp);
             if(tempFile.exists()){
                 tempFile.delete();
